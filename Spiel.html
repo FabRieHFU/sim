@@ -1,0 +1,933 @@
+<!doctype html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bediensimulation</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --fg: #e2e8f0;
+            --panel-bg: #1e293b;
+            --panel-border: #334155;
+            --accent: #22c55e;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100dvh;
+            display: grid;
+            place-items: center;
+            background: var(--bg);
+            color: var(--fg);
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        .app {
+            width: min(900px, 92vw);
+            text-align: center;
+            padding: 10px 0;
+        }
+
+        h1 { margin-bottom: 8px; }
+        p { margin-top: 0; opacity: 0.9; }
+
+        #panel {
+            position: relative;
+            margin: 20px auto;
+            width: min(800px, 92vw);
+            height: min(420px, 58dvh);
+            border: 4px solid var(--panel-border);
+            border-radius: 18px;
+            background: var(--panel-bg);
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+        }
+
+        .status {
+            font-size: 18px;
+            margin: 10px 0 4px;
+            min-height: 24px;
+        }
+
+        .start-btn {
+            position: absolute;
+            left: 18px;
+            bottom: 18px;
+            padding: 14px 24px;
+            border: none;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 18px;
+            cursor: pointer;
+            background: var(--accent);
+            color: #082f13;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+            touch-action: manipulation;
+        }
+
+        .start-btn:hover { filter: brightness(1.06); }
+        .start-btn:active { transform: translateY(1px); }
+        .start-btn.ready {
+            z-index: 6;
+        }
+
+        .control {
+            position: absolute;
+            border-radius: 12px;
+            opacity: 0.85;
+            border: 1px solid rgba(255,255,255,0.2);
+            backdrop-filter: blur(1px);
+        }
+
+        #beginGame {
+            margin-top: 8px;
+            padding: 14px 24px;
+            font-size: 18px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            background: #60a5fa;
+            color: #0b1020;
+            font-weight: 700;
+            touch-action: manipulation;
+        }
+
+        .hidden { display: none; }
+
+        #results {
+            margin-top: 16px;
+            text-align: left;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 12px;
+            padding: 14px;
+        }
+
+        #results h3 { margin: 0 0 10px; }
+        #results ul { margin: 0; padding-left: 20px; }
+        #results table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        #results th,
+        #results td {
+            padding: 8px 6px;
+            border-bottom: 1px solid rgba(148,163,184,0.25);
+            text-align: left;
+        }
+
+        #results th {
+            font-weight: 700;
+            color: #cbd5e1;
+        }
+
+        .color-dot {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 1px solid rgba(255,255,255,0.35);
+            vertical-align: middle;
+        }
+
+        .dot-red { background: #ef4444; }
+        .dot-yellow { background: #fde047; }
+        .dot-blue { background: #7dd3fc; }
+
+        .lamp-note {
+            display: block;
+            margin-top: 4px;
+            font-size: 12px;
+            color: #cbd5e1;
+        }
+
+        .machine-display {
+            position: absolute;
+            width: 210px;
+            min-height: 72px;
+            background: linear-gradient(180deg, rgba(15,23,42,0.88), rgba(2,6,23,0.88));
+            border: 1px solid rgba(148,163,184,0.4);
+            border-radius: 10px;
+            padding: 10px 12px;
+            text-align: left;
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05), 0 8px 16px rgba(0,0,0,0.28);
+        }
+
+        .display-title {
+            font-size: 12px;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            opacity: 0.75;
+        }
+
+        .display-value {
+            margin-top: 8px;
+            font-size: 21px;
+            font-weight: 700;
+            font-family: "Consolas", "Courier New", monospace;
+            color: #bbf7d0;
+        }
+
+        .switch-bank {
+            position: absolute;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            width: 190px;
+            padding: 10px;
+            background: rgba(15,23,42,0.72);
+            border: 1px solid rgba(148,163,184,0.35);
+            border-radius: 10px;
+        }
+
+        .toggle {
+            height: 44px;
+            border-radius: 8px;
+            border: 1px solid rgba(148,163,184,0.4);
+            background: linear-gradient(180deg, #1f2937, #0f172a);
+            position: relative;
+        }
+
+        .toggle::after {
+            content: "";
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 6px;
+            width: 8px;
+            height: 18px;
+            border-radius: 4px;
+            background: #94a3b8;
+        }
+
+        .toggle.on::after {
+            top: 6px;
+            bottom: auto;
+            background: #22c55e;
+            box-shadow: 0 0 8px rgba(34,197,94,0.7);
+        }
+
+        .lamp {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #ef4444;
+            box-shadow: 0 0 10px rgba(239,68,68,0.6);
+        }
+
+        .lamp.ok {
+            background: #22c55e;
+            box-shadow: 0 0 10px rgba(34,197,94,0.6);
+        }
+
+        .tachometer {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 240px;
+            height: 240px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 50% 45%, #1f2937 0%, #0b1020 70%);
+            border: 3px solid rgba(148,163,184,0.6);
+            box-shadow: 0 16px 28px rgba(0,0,0,0.4), inset 0 0 30px rgba(0,0,0,0.55);
+            z-index: 5;
+        }
+
+        .needle {
+            position: absolute;
+            left: 50%;
+            bottom: 50%;
+            width: 4px;
+            height: 88px;
+            transform-origin: bottom center;
+            transform: translateX(-50%) rotate(-120deg);
+            background: linear-gradient(180deg, #f8fafc, #f43f5e);
+            border-radius: 3px;
+        }
+
+        .tachometer::after {
+            content: "";
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 14px;
+            height: 14px;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            background: #e2e8f0;
+            box-shadow: 0 0 10px rgba(226,232,240,0.55);
+        }
+
+        .tacho-value {
+            position: absolute;
+            left: 50%;
+            top: 60%;
+            transform: translateX(-50%);
+            font-family: "Consolas", "Courier New", monospace;
+            font-size: 36px;
+            font-weight: 700;
+            color: #e2e8f0;
+        }
+
+        .tacho-label {
+            position: absolute;
+            left: 50%;
+            top: 75%;
+            transform: translateX(-50%);
+            font-size: 11px;
+            letter-spacing: 1px;
+            opacity: 0.7;
+            text-transform: uppercase;
+        }
+
+        .signal-lamp {
+            position: absolute;
+            right: 24px;
+            bottom: 20px;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #2b0a0f;
+            border: 2px solid rgba(148,163,184,0.45);
+            box-shadow: inset 0 0 8px rgba(0,0,0,0.65);
+            z-index: 7;
+        }
+
+        .signal-lamp.on {
+            background: #ef4444;
+            box-shadow: 0 0 16px rgba(239,68,68,0.85), inset 0 0 5px rgba(255,255,255,0.35);
+        }
+
+        .signal-lamp.yellow {
+            border-color: rgba(148,163,184,0.45);
+        }
+
+        .signal-lamp.yellow.on {
+            background: #fde047;
+            box-shadow: 0 0 16px rgba(250,204,21,0.85), inset 0 0 5px rgba(255,255,255,0.35);
+        }
+
+        .signal-lamp.blue {
+            border-color: rgba(148,163,184,0.45);
+        }
+
+        .signal-lamp.blue.on {
+            background: #7dd3fc;
+            box-shadow: 0 0 16px rgba(56,189,248,0.85), inset 0 0 5px rgba(255,255,255,0.35);
+        }
+
+        .prestart-screen {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 18px;
+            background: linear-gradient(180deg, rgba(2,6,23,0.82), rgba(15,23,42,0.88));
+        }
+
+        .prestart-title {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: 0.4px;
+        }
+
+        .prestart-hint {
+            font-size: 14px;
+            opacity: 0.85;
+            max-width: 560px;
+        }
+
+        .prestart-btn {
+            position: absolute;
+            left: 50%;
+            bottom: 12px;
+            transform: translateX(-50%);
+            padding: 14px 24px;
+            font-size: 17px;
+            border: 1px solid rgba(148,163,184,0.6);
+            border-radius: 10px;
+            background: linear-gradient(180deg, #e2e8f0, #cbd5e1);
+            color: #0f172a;
+            font-weight: 700;
+            cursor: pointer;
+            z-index: 8;
+            touch-action: manipulation;
+        }
+
+        @media (max-width: 760px) {
+            body {
+                place-items: start center;
+            }
+
+            .app {
+                width: 100%;
+                padding: 10px 10px calc(12px + env(safe-area-inset-bottom));
+            }
+
+            h1 {
+                margin: 8px 0 6px;
+                font-size: 1.5rem;
+            }
+
+            p {
+                margin-bottom: 8px;
+                font-size: 0.95rem;
+            }
+
+            .status {
+                margin: 8px 0;
+                font-size: 16px;
+            }
+
+            #panel {
+                width: 100%;
+                margin: 10px auto;
+                height: clamp(440px, 64dvh, 580px);
+                border-width: 3px;
+                border-radius: 14px;
+            }
+
+            .machine-display {
+                width: 140px;
+                min-height: 56px;
+                padding: 7px 8px;
+                border-radius: 8px;
+            }
+
+            .display-title {
+                font-size: 9px;
+                letter-spacing: 0.5px;
+            }
+
+            .display-value {
+                margin-top: 4px;
+                font-size: 14px;
+            }
+
+            .switch-bank {
+                width: 126px;
+                gap: 6px;
+                padding: 6px;
+                border-radius: 8px;
+            }
+
+            .toggle {
+                height: 28px;
+                border-radius: 6px;
+            }
+
+            .toggle::after {
+                bottom: 4px;
+                width: 5px;
+                height: 12px;
+            }
+
+            .toggle.on::after {
+                top: 4px;
+            }
+
+            .lamp {
+                width: 12px;
+                height: 12px;
+            }
+
+            .tachometer {
+                width: 180px;
+                height: 180px;
+            }
+
+            .needle {
+                width: 3px;
+                height: 66px;
+            }
+
+            .tacho-value {
+                font-size: 28px;
+            }
+
+            .tacho-label {
+                font-size: 9px;
+            }
+
+            .signal-lamp {
+                width: 17px;
+                height: 17px;
+                right: 16px;
+                bottom: 14px;
+            }
+
+            .start-btn {
+                left: 12px;
+                bottom: 12px;
+                padding: 14px 20px;
+                font-size: 17px;
+            }
+
+            .prestart-title {
+                font-size: 21px;
+            }
+
+            .prestart-hint {
+                font-size: 13px;
+                max-width: 300px;
+                line-height: 1.35;
+            }
+
+            #results {
+                margin-top: 10px;
+                padding: 12px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <h1>Bediensimulation</h1>
+        <p>Drücke den Button „Break“, wenn der Tacho 12 erreicht hat und zusätzlich die rote Leuchte an ist.</p>
+
+        <div class="status" id="statusText">Drücke „Spiel starten“.</div>
+
+        <div id="panel"></div>
+
+        <button id="beginGame">Spiel starten</button>
+
+        <div id="results" class="hidden"></div>
+    </div>
+
+    <script>
+        const TOTAL_ROUNDS = 14;
+        const panel = document.getElementById("panel");
+        const statusText = document.getElementById("statusText");
+        const beginGame = document.getElementById("beginGame");
+        const resultsBox = document.getElementById("results");
+
+        const neutralTheme = {
+            bg: "linear-gradient(135deg,#0f172a,#1e293b)",
+            border: "#334155",
+            accent: "#22c55e"
+        };
+
+        let round = 0;
+        let reactionStartTime = 0;
+        let times = [];
+        let gameRunning = false;
+        let canPress = false;
+        let tachoInterval = null;
+        let lampTimeouts = [];
+        let gameOver = false;
+        let needleEl = null;
+        let tachoValueEl = null;
+        let signalLampEl = null;
+
+        function randomInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function setTachoValue(value) {
+            if (!needleEl || !tachoValueEl) return;
+            const clipped = Math.max(0, Math.min(40, value));
+            const angle = -120 + (clipped / 40) * 240;
+            needleEl.style.transform = `translateX(-50%) rotate(${angle}deg)`;
+            tachoValueEl.textContent = String(clipped);
+        }
+
+        function clearLampTimeouts() {
+            for (const timeoutId of lampTimeouts) {
+                clearTimeout(timeoutId);
+            }
+            lampTimeouts = [];
+        }
+
+        function getRoundProperties(level) {
+            const lampColor = level === 7 ? "gelb" : level === 10 ? "blau" : "rot";
+            const lampColorKey = level === 7 ? "yellow" : level === 10 ? "blue" : "red";
+            const breakPosition = level === 12
+                ? "oben mitte"
+                : level === 13
+                    ? "rechts mitte"
+                    : level === 14
+                        ? "links mitte"
+                        : "unten links";
+            const lampTiming = level === 5 || level === 9 ? "vor Tacho 12" : "nach Tacho 12";
+
+            return { lampColor, lampColorKey, breakPosition, lampTiming };
+        }
+
+        function setGameOverState() {
+            gameOver = true;
+            beginGame.disabled = true;
+            beginGame.classList.add("hidden");
+        }
+
+        function createMachineDisplays(level) {
+            const display1 = document.createElement("div");
+            display1.className = "machine-display";
+            display1.style.left = "16px";
+            display1.style.top = "18px";
+            if (level === 12) {
+                display1.style.width = "128px";
+                display1.style.top = "86px";
+            }
+            display1.innerHTML = `
+                <div class="display-title">Hydraulikdruck</div>
+                <div class="display-value">${randomInt(145, 182)} bar</div>
+            `;
+
+            const display2 = document.createElement("div");
+            display2.className = "machine-display";
+            display2.style.right = "16px";
+            display2.style.top = "18px";
+            if (level === 12) {
+                display2.style.width = "128px";
+                display2.style.top = "86px";
+            }
+            display2.innerHTML = `
+                <div class="display-title">Spindeltemp.</div>
+                <div class="display-value">${randomInt(58, 79)} C</div>
+            `;
+
+            const display3 = document.createElement("div");
+            display3.className = "machine-display";
+            display3.style.left = "16px";
+            display3.style.top = "104px";
+            display3.innerHTML = `
+                <div class="display-title">Werkzeugstatus</div>
+                <div class="display-value">T${randomInt(3, 9)} / OK</div>
+            `;
+
+            panel.appendChild(display1);
+            panel.appendChild(display2);
+            panel.appendChild(display3);
+
+            const switchBank = document.createElement("div");
+            switchBank.className = "switch-bank";
+            switchBank.style.right = "16px";
+            switchBank.style.bottom = "56px";
+
+            for (let i = 0; i < 6; i++) {
+                const toggle = document.createElement("div");
+                toggle.className = "toggle" + (Math.random() > 0.45 ? " on" : "");
+                switchBank.appendChild(toggle);
+            }
+            panel.appendChild(switchBank);
+
+            const lamp1 = document.createElement("div");
+            lamp1.className = "lamp ok";
+            lamp1.style.left = "245px";
+            lamp1.style.top = "34px";
+
+            const lamp2 = document.createElement("div");
+            lamp2.className = "lamp";
+            lamp2.style.right = "245px";
+            lamp2.style.top = "34px";
+
+            panel.appendChild(lamp1);
+            panel.appendChild(lamp2);
+
+            signalLampEl = document.createElement("div");
+            signalLampEl.className = "signal-lamp";
+            panel.appendChild(signalLampEl);
+        }
+
+        function createTachometer(level) {
+            const tachometer = document.createElement("div");
+            tachometer.className = "tachometer";
+            tachometer.innerHTML = `
+                <div class="needle"></div>
+                <div class="tacho-value">0</div>
+                <div class="tacho-label">Zielwert 12</div>
+            `;
+            if (level === 12) {
+                tachometer.style.left = "16px";
+                tachometer.style.top = "auto";
+                tachometer.style.bottom = "16px";
+                tachometer.style.transform = "none";
+            }
+            panel.appendChild(tachometer);
+            needleEl = tachometer.querySelector(".needle");
+            tachoValueEl = tachometer.querySelector(".tacho-value");
+        }
+
+        function runTachoToTwenty(startBtn, requiresSignalLamp, stopAtTwelve, confuseBeforeTwelve, keepLampOnWhenLit) {
+            if (tachoInterval) clearInterval(tachoInterval);
+            clearLampTimeouts();
+
+            canPress = false;
+            startBtn.classList.remove("ready");
+            let speed = randomInt(0, 4);
+            let hasReachedTwelve = false;
+            let breakWindowOpened = false;
+            const stepsToTarget = 12 - speed;
+            const targetDurationMs = 1500;
+            const delay = Math.max(45, Math.round(targetDurationMs / stepsToTarget));
+
+            if (signalLampEl) {
+                signalLampEl.classList.remove("on");
+            }
+
+            setTachoValue(speed);
+            statusText.textContent = requiresSignalLamp
+                ? "Warte auf Tacho 12 und rote Leuchte..."
+                : "Warte auf Tacho 12...";
+
+            const openBreakWindow = () => {
+                if (breakWindowOpened) return;
+                breakWindowOpened = true;
+                canPress = true;
+                reactionStartTime = performance.now();
+                startBtn.classList.add("ready");
+                statusText.textContent = requiresSignalLamp
+                    ? "Tacho 12 + rote Leuchte an."
+                    : "Tacho zeigt 12.";
+            };
+
+            const tryOpenBreakWindow = () => {
+                if (!hasReachedTwelve) return;
+                if (!requiresSignalLamp) {
+                    openBreakWindow();
+                    return;
+                }
+                if (signalLampEl && signalLampEl.classList.contains("on")) {
+                    openBreakWindow();
+                }
+            };
+
+            if (confuseBeforeTwelve && requiresSignalLamp) {
+                const timeToTwelveMs = Math.max(200, stepsToTarget * delay);
+                const preOnDelay = randomInt(120, Math.max(150, timeToTwelveMs - 180));
+                const preOnDuration = randomInt(180, Math.max(220, timeToTwelveMs - preOnDelay - 40));
+
+                lampTimeouts.push(setTimeout(() => {
+                    if (!signalLampEl) return;
+                    signalLampEl.classList.add("on");
+                    tryOpenBreakWindow();
+                }, preOnDelay));
+
+                if (!keepLampOnWhenLit) {
+                    lampTimeouts.push(setTimeout(() => {
+                        if (!signalLampEl) return;
+                        signalLampEl.classList.remove("on");
+                    }, preOnDelay + preOnDuration));
+                }
+            }
+
+            tachoInterval = setInterval(() => {
+                speed++;
+                setTachoValue(speed);
+
+                if (speed === 12) {
+                    hasReachedTwelve = true;
+
+                    if (stopAtTwelve) {
+                        clearInterval(tachoInterval);
+                        setTachoValue(12);
+                        if (requiresSignalLamp) {
+                            const lampDelayMs = randomInt(120, 620);
+                            statusText.textContent = "Tacho 12 erreicht - warte auf rote Leuchte...";
+                            lampTimeouts.push(setTimeout(() => {
+                                if (signalLampEl) {
+                                    signalLampEl.classList.add("on");
+                                }
+                                tryOpenBreakWindow();
+                            }, lampDelayMs));
+                        } else {
+                            tryOpenBreakWindow();
+                        }
+                        return;
+                    }
+
+                    if (requiresSignalLamp) {
+                        const lampDelayMs = randomInt(0, 480);
+                        lampTimeouts.push(setTimeout(() => {
+                            if (signalLampEl) {
+                                signalLampEl.classList.add("on");
+                            }
+                            tryOpenBreakWindow();
+                        }, lampDelayMs));
+                    } else {
+                        tryOpenBreakWindow();
+                    }
+                }
+
+                if (speed >= 40) {
+                    clearInterval(tachoInterval);
+                    setTachoValue(40);
+                }
+            }, delay);
+        }
+
+        function applyTheme(theme) {
+            panel.style.background = theme.bg;
+            panel.style.borderColor = theme.border;
+            document.documentElement.style.setProperty("--accent", theme.accent);
+        }
+
+        function showPreLevelScreen() {
+            panel.innerHTML = "";
+
+            const screen = document.createElement("div");
+            screen.className = "prestart-screen";
+            screen.innerHTML = `
+                <div class="prestart-title">Bereit?</div>
+                <div class="prestart-hint">Bewege den Finger an den unteren Rand und tippe auf den unteren Button, um zu starten.</div>
+            `;
+
+            const prepBtn = document.createElement("button");
+            prepBtn.className = "prestart-btn";
+            prepBtn.textContent = "Bereit";
+            prepBtn.addEventListener("click", startLevelRound, { once: true });
+
+            panel.appendChild(screen);
+            panel.appendChild(prepBtn);
+            statusText.textContent = "";
+        }
+
+        function startLevelRound() {
+            panel.innerHTML = "";
+            clearLampTimeouts();
+
+            applyTheme(neutralTheme);
+            createMachineDisplays(round);
+            createTachometer(round);
+            const stopAtTwelve = round <= 2;
+            const confuseBeforeTwelve = round === 5 || round === 9;
+            const keepLampOnWhenLit = round === 5 || round === 9;
+            const lampColor = round === 7 ? "yellow" : round === 10 ? "blue" : "";
+            const roundProperties = getRoundProperties(round);
+
+            const startBtn = document.createElement("button");
+            startBtn.className = "start-btn";
+            startBtn.textContent = "BREAK";
+            if (round === 12) {
+                startBtn.style.left = "50%";
+                startBtn.style.right = "auto";
+                startBtn.style.bottom = "auto";
+                startBtn.style.top = "18px";
+                startBtn.style.transform = "translateX(-50%)";
+            } else if (round === 13) {
+                startBtn.style.left = "auto";
+                startBtn.style.right = "18px";
+                startBtn.style.bottom = "auto";
+                startBtn.style.top = "30%";
+                startBtn.style.transform = "translateY(-50%)";
+            } else if (round === 14) {
+                startBtn.style.left = "18px";
+                startBtn.style.right = "auto";
+                startBtn.style.bottom = "auto";
+                startBtn.style.top = "70%";
+                startBtn.style.transform = "translateY(-50%)";
+                startBtn.style.padding = "12px 16px";
+                startBtn.style.fontSize = "16px";
+            }
+            startBtn.addEventListener("click", () => {
+                if (!gameRunning) return;
+                if (!canPress) {
+                    statusText.textContent = "Falscher Zeitpunkt - nur bei Tacho 12 und roter Leuchte.";
+                    return;
+                }
+                startBtn.classList.remove("ready");
+                canPress = false;
+                if (tachoInterval) clearInterval(tachoInterval);
+                clearLampTimeouts();
+                if (signalLampEl) signalLampEl.classList.remove("on");
+                const t = performance.now() - reactionStartTime;
+                times.push({
+                    time: t,
+                    level: round,
+                    properties: roundProperties,
+                });
+                statusText.textContent = `Zeit: ${(t / 1000).toFixed(3)} s`;
+                setTimeout(nextRound, 650);
+            });
+
+            panel.appendChild(startBtn);
+            if (round === 12 && signalLampEl) {
+                signalLampEl.style.left = "50%";
+                signalLampEl.style.right = "auto";
+                signalLampEl.style.top = "20px";
+                signalLampEl.style.bottom = "auto";
+                signalLampEl.style.transform = "translateX(-50%)";
+            } else if (round === 13 && signalLampEl) {
+                signalLampEl.style.left = "24px";
+                signalLampEl.style.right = "auto";
+                signalLampEl.style.top = "auto";
+                signalLampEl.style.bottom = "20px";
+                signalLampEl.style.transform = "none";
+            } else if (round === 14 && signalLampEl) {
+                signalLampEl.style.left = "auto";
+                signalLampEl.style.right = "24px";
+                signalLampEl.style.top = "190px";
+                signalLampEl.style.bottom = "auto";
+                signalLampEl.style.transform = "none";
+            }
+            if (signalLampEl && lampColor) {
+                signalLampEl.classList.add(lampColor);
+            }
+            runTachoToTwenty(startBtn, true, stopAtTwelve, confuseBeforeTwelve, keepLampOnWhenLit);
+        }
+
+        function nextRound() {
+            if (round >= TOTAL_ROUNDS) {
+                finishGame();
+                return;
+            }
+
+            round++;
+            showPreLevelScreen();
+        }
+
+        function finishGame() {
+            gameRunning = false;
+            if (tachoInterval) clearInterval(tachoInterval);
+            clearLampTimeouts();
+
+            const rows = times
+                .map((entry) => `<tr><td>${entry.level}</td><td>${(entry.time / 1000).toFixed(3)} s</td><td><span class="color-dot dot-${entry.properties.lampColorKey}" title="${entry.properties.lampColor}"></span>${entry.properties.lampTiming === "vor Tacho 12" ? '<span class="lamp-note">vor Tacho 12</span>' : ''}</td><td>${entry.properties.breakPosition}</td></tr>`)
+                .join("");
+
+            resultsBox.innerHTML = `
+                <h3>Fertig!</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Level</th>
+                            <th>Zeit</th>
+                            <th>Leuchte</th>
+                            <th>Break-Position</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            `;
+            resultsBox.classList.remove("hidden");
+            statusText.textContent = "Spiel beendet.";
+            panel.innerHTML = "";
+            setGameOverState();
+        }
+
+        function startGame() {
+            if (gameOver) return;
+            round = 0;
+            times = [];
+            gameRunning = true;
+            canPress = false;
+            beginGame.classList.add("hidden");
+            resultsBox.classList.add("hidden");
+            nextRound();
+        }
+
+        beginGame.addEventListener("click", startGame);
+    </script>
+</body>
+</html>
